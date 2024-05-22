@@ -1,10 +1,24 @@
-use sea_orm::{Database, DatabaseConnection, DbErr};
+use actix_web::{ App, HttpServer };
+use db::establish_connection;
+use handlers::register;
+use std::io;
+use actix_web::web::Data;
+use migration::{ Migrator, MigratorTrait };
+mod entity;
+mod handlers;
+mod graphql;
+mod db;
+#[actix_web::main]
+async fn main() -> Result<(), io::Error> {
+    let connection = establish_connection().await.unwrap();
 
-fn main() {
-    println!("Hello, world!");
-}
+    Migrator::up(&connection, None).await.expect("Error running migrations");
 
+    let context = graphql::Context {
+        db: connection.to_owned(),
+    };
 
-async fn establish_connection() -> Result<DatabaseConnection, DbErr> {
-    Database::connect("protocol://username:password@host/database").await
+    HttpServer::new(move || { App::new().app_data(Data::new(context.clone())).configure(register) })
+        .bind(("127.0.0.1", 8080))?
+        .run().await
 }
