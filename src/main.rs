@@ -8,6 +8,7 @@ mod entity;
 mod handlers;
 mod graphql;
 mod db;
+mod services;
 #[actix_web::main]
 async fn main() -> Result<(), io::Error> {
     let connection = establish_connection().await.unwrap();

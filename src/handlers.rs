@@ -6,15 +6,11 @@ use crate::graphql::{ create_schema, Context, Schema };
 
 #[route("/graphql", method = "GET", method = "POST")]
 pub async fn graphql(
-    connection: web::Data<Context>,
     schema: web::Data<Schema>,
+    context: web::Data<Context>,
     data: web::Json<GraphQLRequest>
 ) -> Result<HttpResponse, Error> {
-    let ctx = Context {
-        db: connection.db.clone(),
-    };
-
-    let res = data.execute(&schema, &ctx).await;
+    let res = data.execute(&schema, &context).await;
 
     Ok(HttpResponse::Ok().json(res))
 }
