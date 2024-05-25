@@ -1,13 +1,10 @@
-use chrono::Utc;
 use juniper::graphql_value;
 use juniper::EmptySubscription;
 use juniper::FieldError;
 use juniper::FieldResult;
-use sea_orm::ActiveValue::NotSet;
-use sea_orm::Set;
-use sea_orm::{ DatabaseConnection, EntityTrait };
-use crate::entity::user::{ self, Entity as User };
-use sea_orm::entity::prelude::*;
+use sea_orm::DatabaseConnection;
+use crate::entity::user::{ self };
+use crate::services::UsersService;
 #[derive(Clone)]
 pub struct Context {
     pub db: DatabaseConnection,
@@ -20,7 +17,10 @@ pub struct Query;
 #[juniper::graphql_object(Context = Context)]
 impl Query {
     async fn user(context: &Context, id: i32) -> Option<user::Model> {
-        User::find_by_id(id).one(&context.db).await.expect("Error finding user")
+        UsersService::get_user_by_id(&context.db, id).await.unwrap()
+    }
+    async fn users(context: &Context) -> Vec<user::Model> {
+        UsersService::get_all_users(&context.db).await.unwrap()
     }
 }
 
@@ -34,32 +34,9 @@ impl Mutation {
         email: String,
         password: String
     ) -> FieldResult<user::Model> {
-        let existing_user = User::find()
-            .filter(user::Column::Email.contains(&email))
-            .one(&context.db).await
-            .expect("Error finding user");
-        if let Some(_) = existing_user {
-            return Err(
-                FieldError::new("User already exists", graphql_value!({ "email": email.clone() }))
-            );
-        }
-
-        let active_user = user::ActiveModel {
-            id: NotSet,
-            name: Set(name),
-            email: Set(email),
-            role: Set("user".to_string()),
-            password: Set(password),
-            created_at: Set(Utc::now().naive_utc()),
-            updated_at: Set(Utc::now().naive_utc()),
-            last_signed_in_at: Set(Utc::now().naive_utc()),
-        };
-
-        active_user
-            .insert(&context.db).await
-            .map_err(|e| {
-                FieldError::new("Error creating user", graphql_value!({ "error": e.to_string() }))
-            })
+        UsersService::create_user(&context.db, name, email, password).await.map_err(|e|
+            FieldError::new(e, graphql_value!({ "internal_error": "An error occurred" }))
+        )
     }
 }
 
