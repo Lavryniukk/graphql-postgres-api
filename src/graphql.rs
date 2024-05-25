@@ -1,9 +1,9 @@
-use juniper::graphql_value;
 use juniper::EmptySubscription;
-use juniper::FieldError;
 use juniper::FieldResult;
 use sea_orm::DatabaseConnection;
+use crate::db::ToFieldError;
 use crate::entity::user::{ self };
+use crate::services::users_service::CreateUserInput;
 use crate::services::UsersService;
 #[derive(Clone)]
 pub struct Context {
@@ -16,11 +16,11 @@ pub struct Query;
 
 #[juniper::graphql_object(Context = Context)]
 impl Query {
-    async fn user(context: &Context, id: i32) -> Option<user::Model> {
-        UsersService::get_user_by_id(&context.db, id).await.unwrap()
+    async fn user(context: &Context, id: i32) -> FieldResult<Option<user::Model>> {
+        UsersService::get_user_by_id(&context.db, id).await.map_err(|e| e.to_field_error())
     }
-    async fn users(context: &Context) -> Vec<user::Model> {
-        UsersService::get_all_users(&context.db).await.unwrap()
+    async fn users(context: &Context) -> FieldResult<Vec<user::Model>> {
+        UsersService::get_all_users(&context.db).await.map_err(|e| e.to_field_error())
     }
 }
 
@@ -30,13 +30,9 @@ pub struct Mutation;
 impl Mutation {
     async fn create_user(
         context: &Context,
-        name: String,
-        email: String,
-        password: String
+        create_user_dto: CreateUserInput
     ) -> FieldResult<user::Model> {
-        UsersService::create_user(&context.db, name, email, password).await.map_err(|e|
-            FieldError::new(e, graphql_value!({ "internal_error": "An error occurred" }))
-        )
+        UsersService::create_user(&context.db, create_user_dto).await.map_err(|e| e.to_field_error())
     }
 }
 

@@ -3,18 +3,24 @@ use sea_orm::ActiveValue::NotSet;
 use sea_orm::{ ColumnTrait, EntityTrait, QueryFilter, Set, TryIntoModel };
 use sea_orm::entity::prelude::*;
 use crate::entity::user::{self, Model as User};
+
 use crate::entity::user::Entity as UserEntity;
+#[derive(juniper::GraphQLInputObject)]
+pub struct CreateUserInput {
+    pub name: String,
+    pub email: String,
+    pub password: String,
+}
+
 pub struct UsersService {}
 
 impl UsersService {
     pub async fn create_user(
         connection: &DbConn,
-        name: String,
-        email: String,
-        password: String
+        create_user_dto: CreateUserInput
     ) -> Result<User, DbErr> {
         let existing_user = UserEntity::find()
-            .filter(user::Column::Email.contains(&email))
+            .filter(user::Column::Email.contains(&create_user_dto.email))
             .one(connection).await
             .expect("Error finding user");
 
@@ -24,10 +30,10 @@ impl UsersService {
 
         let active_user = user::ActiveModel {
             id: NotSet,
-            name: Set(name),
-            email: Set(email),
+            name: Set(create_user_dto.name),
+            email: Set(create_user_dto.email),
             role: Set("user".to_string()),
-            password: Set(password),
+            password: Set(create_user_dto.password),
             created_at: Set(Utc::now().naive_utc()),
             updated_at: Set(Utc::now().naive_utc()),
             last_signed_in_at: Set(Utc::now().naive_utc()),
